@@ -12,6 +12,9 @@ on:
     types: [opened, closed, reopened]
   issue_comment:
     types: [created]
+  fork:
+  star:
+  watch:
 
 jobs:
   notify:
@@ -22,10 +25,9 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           EVENT_NAME="${{ github.event_name }}"
-          PAYLOAD=""
 
           if [ "$EVENT_NAME" = "push" ]; then
-            PAYLOAD="{\"content\": \"📦 **${{ github.actor }}** pushed to branch \`${{ github.ref_name }}\` in [${{ github.repository }}](https://github.com/${{ github.repository }}/commits).\"}"
+            PAYLOAD="{\"content\": \"📢 **${{ github.actor }}** pushed to branch \`${{ github.ref_name }}\` in [${{ github.repository }}](https://github.com/${{ github.repository }}).\n\nCommit message: ${{ github.event.head_commit.message }}\nCommit URL: ${{ github.event.head_commit.url }}\"}"
           elif [ "$EVENT_NAME" = "pull_request" ]; then
             ACTION="${{ github.event.action }}"
             PR_NUMBER="${{ github.event.pull_request.number }}"
@@ -46,8 +48,14 @@ jobs:
             COMMENTER="${{ github.event.comment.user.login }}"
             ISSUE_URL="${{ github.event.issue.html_url }}"
             PAYLOAD="{\"content\": \"💬 New comment by **${COMMENTER}** on issue #${ISSUE_NUMBER}. <${ISSUE_URL}>\"}"
+          elif [ "$EVENT_NAME" = "fork" ]; then
+            PAYLOAD="{\"content\": \"🍴 Repository [${{ github.repository }}](https://github.com/${{ github.repository }}) was forked by **${{ github.actor }}**.\"}"
+          elif [ "$EVENT_NAME" = "star" ]; then
+            PAYLOAD="{\"content\": \"⭐ Repository [${{ github.repository }}](https://github.com/${{ github.repository }}) was starred by **${{ github.actor }}**.\"}"
+          elif [ "$EVENT_NAME" = "watch" ]; then
+            PAYLOAD="{\"content\": \"👁️ Repository [${{ github.repository }}](https://github.com/${{ github.repository }}) was watched by **${{ github.actor }}**.\"}"
           else
-            PAYLOAD="{\"content\": \"Event ${EVENT_NAME} received from **${{ github.actor }}**.\"}"
+            PAYLOAD="{\"content\": \"ℹ️ Event \`${EVENT_NAME}\` received from **${{ github.actor }}**.\"}"
           fi
 
           curl -H "Content-Type: application/json" -X POST -d "$PAYLOAD" $DISCORD_WEBHOOK
