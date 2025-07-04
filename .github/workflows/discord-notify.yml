@@ -1,4 +1,4 @@
-name: Notify Discord on Push
+name: Notify Discord on GitHub Activity
 
 on:
   push:
@@ -6,16 +6,48 @@ on:
       - main
       - dev
       - 'feature/**'
+  pull_request:
+    types: [opened, closed, reopened, merged]
+  issues:
+    types: [opened, closed, reopened]
+  issue_comment:
+    types: [created]
 
 jobs:
-  discord:
+  notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send message to Discord
+      - name: Send Discord notification
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          curl -H "Content-Type: application/json" \
-            -X POST \
-            -d "{\"content\": \"📦 ${{ github.actor }} pushed to `${{ github.ref_name }}` in [${{ github.repository }}](https://github.com/${{ github.repository }}/commits).\"}" \
-            $DISCORD_WEBHOOK
+          EVENT_NAME="${{ github.event_name }}"
+          PAYLOAD=""
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            PAYLOAD="{\"content\": \"📦 **${{ github.actor }}** pushed to branch \`${{ github.ref_name }}\` in [${{ github.repository }}](https://github.com/${{ github.repository }}/commits).\"}"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            ACTION="${{ github.event.action }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="${{ github.event.pull_request.html_url }}"
+            if [ "$ACTION" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
+              ACTION="merged"
+            fi
+            PAYLOAD="{\"content\": \"🔀 Pull request #${PR_NUMBER} **${PR_TITLE}** was **${ACTION}** by **${{ github.actor }}**. <${PR_URL}>\"}"
+          elif [ "$EVENT_NAME" = "issues" ]; then
+            ACTION="${{ github.event.action }}"
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            ISSUE_TITLE="${{ github.event.issue.title }}"
+            ISSUE_URL="${{ github.event.issue.html_url }}"
+            PAYLOAD="{\"content\": \"🐛 Issue #${ISSUE_NUMBER} **${ISSUE_TITLE}** was **${ACTION}** by **${{ github.actor }}**. <${ISSUE_URL}>\"}"
+          elif [ "$EVENT_NAME" = "issue_comment" ]; then
+            ISSUE_NUMBER="${{ github.event.issue.number }}"
+            COMMENTER="${{ github.event.comment.user.login }}"
+            ISSUE_URL="${{ github.event.issue.html_url }}"
+            PAYLOAD="{\"content\": \"💬 New comment by **${COMMENTER}** on issue #${ISSUE_NUMBER}. <${ISSUE_URL}>\"}"
+          else
+            PAYLOAD="{\"content\": \"Event ${EVENT_NAME} received from **${{ github.actor }}**.\"}"
+          fi
+
+          curl -H "Content-Type: application/json" -X POST -d "$PAYLOAD" $DISCORD_WEBHOOK
