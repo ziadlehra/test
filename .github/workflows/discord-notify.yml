@@ -1,4 +1,4 @@
-name: Notify Discord on Push
+name: Notify Discord on Push and PR
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - main
       - dev
       - 'feature/**'
+  pull_request:
+    types: [opened, closed, reopened]
 
 jobs:
   notify:
@@ -15,7 +17,28 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
+          EVENT="${{ github.event_name }}"
+          ACTOR="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+
+          if [ "$EVENT" = "push" ]; then
+            REF="${{ github.ref_name }}"
+            COMMIT_MSG="${{ github.event.head_commit.message }}"
+            COMMIT_URL="${{ github.event.head_commit.url }}"
+            MESSAGE="📦 **$ACTOR** pushed to \`$REF\` in [$REPO](https://github.com/$REPO)\n**Commit:** $COMMIT_MSG\n🔗 $COMMIT_URL"
+          
+          elif [ "$EVENT" = "pull_request" ]; then
+            ACTION="${{ github.event.action }}"
+            PR_TITLE="${{ github.event.pull_request.title }}"
+            PR_URL="${{ github.event.pull_request.html_url }}"
+            MERGED="${{ github.event.pull_request.merged }}"
+            if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
+              ACTION="merged"
+            fi
+            MESSAGE="🔀 Pull Request **${PR_TITLE}** was **${ACTION}** by **${ACTOR}**\n🔗 $PR_URL"
+          fi
+
           curl -H "Content-Type: application/json" \
             -X POST \
-            -d "{\"content\": \"📦 **${{ github.actor }}** pushed to branch \`${{ github.ref_name }}\` in [${{ github.repository }}](https://github.com/${{ github.repository }}).\n\n**Commit:** ${{ github.event.head_commit.message }}\n🔗 [View Commit](${{ github.event.head_commit.url }})\"}" \
+            -d "{\"content\": \"$MESSAGE\"}" \
             $DISCORD_WEBHOOK
