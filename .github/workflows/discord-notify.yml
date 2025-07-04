@@ -24,43 +24,45 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          EVENT_NAME="${{ github.event_name }}"
-          ACTION="${{ github.event.action }}"
-          
-          # Default fallback message
-          PAYLOAD="{\"content\": \"ℹ️ Event \`${EVENT_NAME}\` triggered by **${{ github.actor }}**.\"}"
+          EVENT="${{ github.event_name }}"
+          ACTOR="${{ github.actor }}"
+          REPO="${{ github.repository }}"
+          REF="${{ github.ref_name }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          COMMIT_URL="${{ github.event.head_commit.url }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_URL="${{ github.event.pull_request.html_url }}"
+          ISSUE_TITLE="${{ github.event.issue.title }}"
+          ISSUE_URL="${{ github.event.issue.html_url }}"
+          COMMENTER="${{ github.event.comment.user.login }}"
+          FORK_URL="${{ github.event.forkee.html_url }}"
 
-          if [ "$EVENT_NAME" = "push" ]; then
-            PAYLOAD="{\"content\": \"📦 **${{ github.actor }}** pushed to \`${{ github.ref_name }}\` in [${{ github.repository }}](https://github.com/${{ github.repository }}).\n\n**Commit message:** ${{ github.event.head_commit.message }}\n🔗 [View Commit](${{ github.event.head_commit.url }})\"}"
-          elif [ "$EVENT_NAME" = "pull_request" ]; then
-            PR_TITLE="${{ github.event.pull_request.title }}"
-            PR_NUMBER="${{ github.event.pull_request.number }}"
-            PR_URL="${{ github.event.pull_request.html_url }}"
-            MERGED="${{ github.event.pull_request.merged }}"
-            if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
+          # Default fallback
+          MESSAGE="ℹ️ Event \`$EVENT\` triggered by **$ACTOR**."
+
+          if [ "$EVENT" = "push" ]; then
+            MESSAGE="📦 **$ACTOR** pushed to \`$REF\` in [$REPO](https://github.com/$REPO)\n**Message:** $COMMIT_MSG\n🔗 $COMMIT_URL"
+          elif [ "$EVENT" = "pull_request" ]; then
+            ACTION="${{ github.event.action }}"
+            if [ "$ACTION" = "closed" ] && [ "${{ github.event.pull_request.merged }}" = "true" ]; then
               ACTION="merged"
             fi
-            PAYLOAD="{\"content\": \"🔀 Pull Request #${PR_NUMBER} **${PR_TITLE}** was **${ACTION}** by **${{ github.actor }}**.\n🔗 [View PR](${PR_URL})\"}"
-          elif [ "$EVENT_NAME" = "issues" ]; then
-            ISSUE_TITLE="${{ github.event.issue.title }}"
-            ISSUE_NUMBER="${{ github.event.issue.number }}"
-            ISSUE_URL="${{ github.event.issue.html_url }}"
-            PAYLOAD="{\"content\": \"🐛 Issue #${ISSUE_NUMBER} **${ISSUE_TITLE}** was **${ACTION}** by **${{ github.actor }}**.\n🔗 [View Issue](${ISSUE_URL})\"}"
-          elif [ "$EVENT_NAME" = "issue_comment" ]; then
-            COMMENTER="${{ github.event.comment.user.login }}"
-            ISSUE_NUMBER="${{ github.event.issue.number }}"
-            ISSUE_URL="${{ github.event.issue.html_url }}"
-            PAYLOAD="{\"content\": \"💬 **${COMMENTER}** commented on Issue #${ISSUE_NUMBER}.\n🔗 [View Comment](${ISSUE_URL})\"}"
-          elif [ "$EVENT_NAME" = "fork" ]; then
-            FORK_URL="${{ github.event.forkee.html_url }}"
-            PAYLOAD="{\"content\": \"🍴 **${{ github.actor }}** forked [${{ github.repository }}](https://github.com/${{ github.repository }}).\n🔗 [View Fork](${FORK_URL})\"}"
-          elif [ "$EVENT_NAME" = "star" ]; then
-            PAYLOAD="{\"content\": \"⭐ **${{ github.actor }}** starred [${{ github.repository }}](https://github.com/${{ github.repository }})\"}"
-          elif [ "$EVENT_NAME" = "watch" ]; then
-            PAYLOAD="{\"content\": \"👁️ **${{ github.actor }}** is now watching [${{ github.repository }}](https://github.com/${{ github.repository }})\"}"
+            MESSAGE="🔀 Pull Request **$PR_TITLE** was **$ACTION** by **$ACTOR**\n🔗 $PR_URL"
+          elif [ "$EVENT" = "issues" ]; then
+            ACTION="${{ github.event.action }}"
+            MESSAGE="🐛 Issue **$ISSUE_TITLE** was **$ACTION** by **$ACTOR**\n🔗 $ISSUE_URL"
+          elif [ "$EVENT" = "issue_comment" ]; then
+            MESSAGE="💬 **$COMMENTER** commented on an issue\n🔗 $ISSUE_URL"
+          elif [ "$EVENT" = "fork" ]; then
+            MESSAGE="🍴 **$ACTOR** forked [$REPO](https://github.com/$REPO)\n🔗 $FORK_URL"
+          elif [ "$EVENT" = "star" ]; then
+            MESSAGE="⭐ **$ACTOR** starred [$REPO](https://github.com/$REPO)"
+          elif [ "$EVENT" = "watch" ]; then
+            MESSAGE="👁️ **$ACTOR** is watching [$REPO](https://github.com/$REPO)"
           fi
 
+          # Post to Discord
           curl -H "Content-Type: application/json" \
             -X POST \
-            -d "$PAYLOAD" \
+            -d "{\"content\": \"$MESSAGE\"}" \
             $DISCORD_WEBHOOK
