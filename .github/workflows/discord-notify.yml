@@ -25,7 +25,7 @@ jobs:
             REF="${{ github.ref_name }}"
             COMMIT_MSG="${{ github.event.head_commit.message }}"
             COMMIT_URL="${{ github.event.head_commit.url }}"
-            MESSAGE="📦 **$ACTOR** pushed to \`$REF\` in [$REPO](https://github.com/$REPO)\n**Commit:** $COMMIT_MSG\n🔗 $COMMIT_URL"
+            MESSAGE="📦 **$ACTOR** pushed to \`$REF\` in \`$REPO\`\\nCommit: $COMMIT_MSG\\n🔗 <$COMMIT_URL>"
           
           elif [ "$EVENT" = "pull_request" ]; then
             ACTION="${{ github.event.action }}"
@@ -35,7 +35,7 @@ jobs:
             if [ "$ACTION" = "closed" ] && [ "$MERGED" = "true" ]; then
               ACTION="merged"
             fi
-            MESSAGE="🔀 Pull Request **${PR_TITLE}** was **${ACTION}** by **${ACTOR}**\n🔗 $PR_URL"
+            MESSAGE="🔀 Pull Request **$PR_TITLE** was **$ACTION** by **$ACTOR**\\n🔗 <$PR_URL>"
           fi
 
           curl -H "Content-Type: application/json" \
